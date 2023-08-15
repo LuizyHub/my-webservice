@@ -1,5 +1,36 @@
 # 웹 서비스 만들기
 
+## 개요
+개발자가 되고싶었던 코딩루이지
+
+억대 연봉을 받고 있는 친구에게 찾아간다
+
+"나 너와같은 개발자가 되고싶어! 뭐 부터 해봐야 할까?"
+
+친구는 나의 말을 귀담아 들어주고, 회사 동료들이랑도 회의를 해봤다고 한다.
+
+공통적으로 나온 대답은 "개발부터 배포까지를 한번 다 경험해보는게 좋겠다" 라는 답과 함께
+
+책 한권을 추천해줬다.
+
+[**_스프링 부트와 AWS로 혼자 구현하는 웹 서비스_**](https://freelec.co.kr/book/스프링-부트와-aws로-혼자-구현하는-웹-서비스/#tabs_desc_796_3)
+
+이 책을 시작으로 게시판 만들기의 과정들을 익혀보자!
+
+<!-- TOC -->
+* [웹 서비스 만들기](#웹-서비스-만들기)
+  * [개요](#개요)
+  * [프로젝트 생성하기](#프로젝트-생성하기)
+  * [Gradle 버전 맞추기](#gradle-버전-맞추기)
+  * [build.gradle 세팅](#buildgradle-세팅)
+  * [.ignore](#ignore)
+  * [github에 프로젝트 공유하기](#github에-프로젝트-공유하기)
+  * [테스트 코드 작성하기](#테스트-코드-작성하기)
+  * [lombok](#lombok)
+<!-- TOC -->
+
+---
+
 ## 프로젝트 생성하기
 ![스크린샷 2023-08-15 오후 9.19.15.png](image%2F%EC%8A%A4%ED%81%AC%EB%A6%B0%EC%83%B7%202023-08-15%20%EC%98%A4%ED%9B%84%209.19.15.png)
 
@@ -16,8 +47,10 @@ JDK - 1.8
 ./gradlew wrapper --gradle-version 4.10.2
 ```
 
-## build.gradle 세팅
+---
 
+## build.gradle 세팅
+[build.gradle](build.gradle)
 ```gradle
 buildscript {
     ext {
@@ -52,6 +85,8 @@ dependencies {
 }
 ```
 
+---
+
 ## .ignore
 
 ![스크린샷 2023-08-15 오후 9.10.12.png](image%2F%EC%8A%A4%ED%81%AC%EB%A6%B0%EC%83%B7%202023-08-15%20%EC%98%A4%ED%9B%84%209.10.12.png)
@@ -64,6 +99,8 @@ dependencies {
 .idea
 ```
 
+---
+
 ## github에 프로젝트 공유하기
 
 ![스크린샷 2023-08-15 오후 9.26.52.png](image%2F%EC%8A%A4%ED%81%AC%EB%A6%B0%EC%83%B7%202023-08-15%20%EC%98%A4%ED%9B%84%209.26.52.png)
@@ -73,6 +110,8 @@ dependencies {
 [https://github.com/LuizyHub/my-webservice](https://github.com/LuizyHub/my-webservice)
 
 ## 테스트 코드 작성하기
+
+---
 
 [Application.java](src/main/java/springboot/Application.java)
 ```java
@@ -160,3 +199,89 @@ public class HelloControllerTest {
    - mvc.perform의 결과를 검증합니다.	
    - 응답 본문의 내용을 검증합니다.	
    - Controller에서 hello를 리턴하기 때문에 이 값이 맞는지 검증합니다.
+
+## lombok
+
+---
+
+[build.gradle](build.gradle)
+```gradle
+dependencies {
+    compile('org.projectlombok:lombok')
+}
+```
+추가
+
+![스크린샷 2023-08-15 오후 11.44.41.png](image%2F%EC%8A%A4%ED%81%AC%EB%A6%B0%EC%83%B7%202023-08-15%20%EC%98%A4%ED%9B%84%2011.44.41.png)
+
+plugin 설치
+
+[src/main/java/springboot/web/dto/HelloResponseDto.java](src/main/java/springboot/web/dto/HelloResponseDto.java) 추가
+
+```java
+@Getter
+@RequiredArgsConstructor
+public class HelloResponseDto {
+
+    private final String name;
+    private final int amount;
+}
+```
+1. @Getter	
+   - 선언된 모든 필드의 get 메소드를 생성해 줍니다. 
+
+2. @RequiredArgsConstructor	
+   - 선언된 모든 final 필드가 포함된 생성자를 생성해 줍니다.	
+   - final이 없는 필드는 생성자에 포함되지 않습니다.
+
+
+[HelloController.java](src/main/java/springboot/web/HelloController.java) 추가
+```java
+@RestController
+public class HelloController {
+    
+   @GetMapping("/hello/dto")
+   public HelloResponseDto helloDto(@RequestParam("name") String name,
+                                    @RequestParam("amount") int amount) {
+      return new HelloResponseDto(name, amount);
+   }
+}
+```
+
+@RequestParam	
+- 외부에서 API로 넘긴 파라미터를 가져오는 어노테이션입니다.	
+- 여기서는 외부에서 name (@RequestParam("name")) 이란 이름으로 넘긴 파라미터를 메소드 파라미터 name(String name)에 저장하게 됩니다.
+
+[src/test/java/springboot/web/HelloControllerTest.java](src/test/java/springboot/web/HelloControllerTest.java) 추가
+
+```java
+@RunWith(SpringRunner.class)
+@WebMvcTest(controllers = HelloController.class)
+public class HelloControllerTest {
+    
+    @Test
+    public void helloDto가_리턴된다() throws Exception {
+        String name = "hello";
+        int amount = 1000;
+
+        mvc.perform(
+                        get("/hello/dto")
+                                .param("name", name)
+                                .param("amount", String.valueOf(amount)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name", is(name)))
+                .andExpect(jsonPath("$.amount", is(amount)));
+    }
+}
+```
+
+1. param	
+   - API 테스트할 때 사용될 요청 파라미터를 설정합니다.	
+   - 단, 값은 String만 허용됩니다.	
+   - 그래서 숫자/날짜 등의 데이터도 등록할 때는 문자열로 변경해야만 가능합니다.
+
+2. jsonPath		
+   - JSON 응답값을 필드별로 검증할 수 있는 메소드입니다.		
+   - $를 기준으로 필드명을 명시합니다.		
+   - 여기서는 name과 amount를 검증하니 $.name, $.amount로 검증합니다.
+
