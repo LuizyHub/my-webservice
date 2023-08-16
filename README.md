@@ -285,3 +285,136 @@ public class HelloControllerTest {
    - $를 기준으로 필드명을 명시합니다.		
    - 여기서는 name과 amount를 검증하니 $.name, $.amount로 검증합니다.
 
+## JPA 활용하기
+[build.gradle](build.gradle)  의존성 추가
+```gradle
+dependencies {
+    //jpa
+    compile('org.springframework.boot:spring-boot-starter-data-jpa')
+    compile('com.h2database:h2')
+}
+```
+1. spring-boot-starter-data-jpa	
+   - 스프링 부트용 Spring Data Jpa 추상화 라이브러리입니다.	
+   - 스프링 부트 버전에 맞춰 자동으로 JPA관련 라이브러리들의 버전을 관리해 줍니다.
+2. h2
+   - 인메모리 관계형 데이터베이스입니다.
+   - 별도의 설치가 필요 없이 프로젝트 의존성만으로 관리할 수 있습니다.
+   - 메모리에서 실행되기 때문에 애플리케이션을 재시작할 때마다 초기화된다는 점을 이용하여 테스트 용도로 많이 사용됩니다.
+   - 이 책에서는 JPA의 테스트, 로컬 환경에서의 구동에서 사용할 예정입니다.
+
+[Posts.java](src/main/java/springboot/domain/posts/Posts.java)
+```java
+@Getter
+@NoArgsConstructor
+@Entity
+public class Posts {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(length = 500, nullable = false)
+    private String title;
+
+    @Column(columnDefinition = "TEXT", nullable = false)
+    private String content;
+
+    private String author;
+
+    @Builder
+    public Posts(String title, String content, String author) {
+        this.title = title;
+        this.content = content;
+        this.author = author;
+    }
+}
+```
+
+1. @Entity 
+   - 테이블과 링크될 클래스임을 나타냅니다.
+   - 기본값으로 클래스의 카멜케이스 이름을 언더스코어 네이밍(_)으로 테이블 이름을 매칭합니다.
+   - ex) SalesManager.java > sales_manager table 
+2. @Id 
+   - 해당 테이블의 PK 필드를 나타냅니다. 
+3. @GeneratedValue	
+   - PK의 생성 규칙을 나타냅니다.	
+   - 스프링 부트 2.0 에서는 GenerationType.IDENTITY 옵션을 추가해야만 auto_increment가 됩니다.	
+   - 스프링 부트 2.0 버전과 1.5 버전의 차이는 [https://jojoldu.tistory.com/295](https://jojoldu.tistory.com/295) 에 정리했으니 참고하세요. 
+4. @Column 
+   - 테이블의 칼럼을 나타내며 굳이 선언하지 않더라도 해당 클래스의 필드는 모두 칼럼이 됩니다.	
+   - 사용하는 이유는, 기본값 외에 추가로 변경이 필요한 옵션이 있으면 사용합니다.	
+   - 문자열의 경우 VARCHAR(255)가 기본값인데, 사이즈를 500으로 늘리고 싶거나(ex: title), 타입을 TEXT로 변경하고 싶거나(ex: content) 등의 경우에 사용됩니다.
+5. @NoArgsConstructor	
+   - 기본 생성자 자동 추가	public Posts( ) {}와 같은 효과 
+6. @Getter	
+   - 내 모든 필드의 Getter 메소드를 자동생성 
+7. @Builder 
+   - 해당 클래스의 빌더 패턴 클래스를 생성	
+   - 생성자 상단에 선언 시 생성자에 포함된 필드만 빌더에 포함
+```java
+Example.builder()
+        .a(a)
+        .b(b)
+        .build();
+```
+
+[PostsRepository.java](src/main/java/springboot/domain/posts/PostsRepository.java) 추가
+```java
+public interface PostsRepository extends JpaRepository<Posts, Long> {
+}
+```
+
+### sql 쿼리 보기
+[application.properties](src/main/resources/application.properties)
+```properties
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQL5InnoDBDialect
+```
+
+### 테스트 코드 추가
+[HelloResponseDtoTest.java](src/test/java/springboot/web/dto/HelloResponseDtoTest.java)
+```java
+@RunWith(SpringRunner.class)
+@SpringBootTest
+public class PostsRepositoryTest {
+
+    @Autowired
+    PostsRepository postsRepository;
+
+    @After
+    public void cleanup() {
+        postsRepository.deleteAll();
+    }
+
+    @Test
+    public void 게시글저장_불러오기() {
+        //given
+        String title = "테스트 게시글";
+        String content = "테스트 본문";
+
+        postsRepository.save(Posts.builder()
+                .title(title)
+                .content(content)
+                .author("luizy991212@gmail.com")
+                .build());
+
+        //when
+        List<Posts> postsList = postsRepository.findAll();
+
+        //then
+        Posts posts = postsList.get(0);
+        assertThat(posts.getTitle()).isEqualTo(title);
+        assertThat(posts.getContent()).isEqualTo(content);
+    }
+}
+```
+1. @After	
+   - Junit에서 단위 테스트가 끝날 때마다 수행되는 메소드를 지정
+   - 보통은 배포 전 전체 테스트를 수행할 때 테스트간 데이터 침범을 막기 위해 사용합니다.
+   - 여러 테스트가 동시에 수행되면 테스트용 데이터베이스인 H2에 데이터가 그대로 남아 있어 다음 테스트 실행 시 테스트가 실패할 수 있습니다. 
+2. postsRepository.save	
+   - 테이블 posts에 insert/update 쿼리를 실행합니다.
+   - id 값이 있다면 update가, 없다면 insert 쿼리가 실행됩니다. 
+3. postsRepository.findAll
+   - 테이블 posts에 있는 모든 데이터를 조회해오는 메소드입니다.
